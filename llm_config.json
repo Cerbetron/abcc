@@ -1,0 +1,7 @@
+{
+  "models": {
+    "planner": "gpt-4-turbo",
+    "writer": "llama-3-8b",
+    "reviewer": "gpt-3.5-turbo"
+  }
+}

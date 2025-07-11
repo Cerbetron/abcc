@@ -1,0 +1,4 @@
+model_name,input_price_per_1k,output_price_per_1k
+gpt-4-turbo,0.01,0.03
+gpt-3.5-turbo,0.0015,0.002
+llama-3-8b,0.00015,0.0002
