@@ -1,29 +1,26 @@
-"""Simple Flask server to display agent usage reports."""
-from __future__ import annotations
-
+from fastapi import FastAPI
+from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
 import os
-from flask import Flask, send_from_directory, render_template
 import pandas as pd
 
 LOG_FILE = os.path.join('logs', 'agent_usage_log.csv')
+TEMPLATE_FILE = os.path.join('templates', 'report.html')
 
-app = Flask(__name__, static_url_path='')
-
-@app.route('/')
-def report() -> str:
-    # Render static HTML template. Data is loaded client side via JavaScript.
-    return render_template('report.html')
-
-@app.route('/log.csv')
-def log_file():
-    return send_from_directory('logs', 'agent_usage_log.csv')
+app = FastAPI()
 
 
-def load_data():
+
+@app.get("/", response_class=HTMLResponse)
+async def get_report():
+    if os.path.exists(TEMPLATE_FILE):
+        with open(TEMPLATE_FILE, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read(), status_code=200)
+    return HTMLResponse(content="<h1>Template not found</h1>", status_code=404)
+
+
+@app.get("/log.csv")
+async def get_log_file():
     if os.path.exists(LOG_FILE):
-        return pd.read_csv(LOG_FILE)
-    return pd.DataFrame()
-
-
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=8000)
+        return FileResponse(LOG_FILE, media_type="text/csv", filename="agent_usage_log.csv")
+    return {"error": "Log file not found."}

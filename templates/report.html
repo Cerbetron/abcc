@@ -1,75 +1,561 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Agent Usage Report</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agent Usage Analytics Dashboard</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --success-color: #10b981;
+      --warning-color: #f59e0b;
+      --danger-color: #ef4444;
+    }
+
+    body {
+      background-color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .dashboard-header {
+      background: var(--primary-gradient);
+      color: white;
+      padding: 2rem 0;
+      margin: -1.5rem -12px 2rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    .metric-card {
+      background: white;
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .metric-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .metric-value {
+      font-size: 2rem;
+      font-weight: 700;
+      background: var(--primary-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .chart-container {
+      background: white;
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      margin-bottom: 2rem;
+    }
+
+    .table-container {
+      background: white;
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .custom-table {
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .custom-table thead {
+      background: var(--primary-gradient);
+      color: white;
+    }
+
+    .custom-table th {
+      border: none;
+      padding: 1rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.875rem;
+      letter-spacing: 0.05em;
+    }
+
+    .custom-table td {
+      padding: 0.875rem 1rem;
+      vertical-align: middle;
+      border-color: #e5e7eb;
+    }
+
+    .custom-table tbody tr:hover {
+      background-color: #f9fafb;
+      transition: background-color 0.2s;
+    }
+
+    .cost-badge {
+      font-weight: 600;
+      padding: 0.375rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.875rem;
+    }
+
+    .cost-low {
+      background-color: rgba(16, 185, 129, 0.1);
+      color: var(--success-color);
+    }
+
+    .cost-medium {
+      background-color: rgba(245, 158, 11, 0.1);
+      color: var(--warning-color);
+    }
+
+    .cost-high {
+      background-color: rgba(239, 68, 68, 0.1);
+      color: var(--danger-color);
+    }
+
+    .filter-controls {
+      background: white;
+      border-radius: 12px;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .loading-spinner {
+      display: none;
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      z-index: 1000;
+    }
+
+    .error-message {
+      display: none;
+      margin-top: 1rem;
+    }
+
+    .refresh-indicator {
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .trend-indicator {
+      font-size: 0.875rem;
+      margin-left: 0.5rem;
+    }
+
+    .trend-up {
+      color: var(--danger-color);
+    }
+
+    .trend-down {
+      color: var(--success-color);
+    }
+  </style>
 </head>
-<body class="container py-4">
-  <h1 class="mb-4">Agent Usage Report</h1>
-  <h4>Total Cost: $<span id="total-cost">0.0000</span></h4>
-  <div class="my-3">
-    <canvas id="costChart" height="100"></canvas>
+<body>
+  <div class="dashboard-header">
+    <div class="container">
+      <div class="row align-items-center">
+        <div class="col-md-8">
+          <h1 class="mb-0">
+            <i class="bi bi-graph-up me-3"></i>Agent Usage Analytics
+          </h1>
+          <p class="mb-0 mt-2 opacity-75">Real-time monitoring and cost analysis</p>
+        </div>
+        <div class="col-md-4 text-md-end">
+          <button class="btn btn-light btn-sm" onclick="toggleAutoRefresh()">
+            <i class="bi bi-arrow-clockwise me-2" id="refresh-icon"></i>
+            <span id="refresh-text">Auto-refresh: ON</span>
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
-  <table class="table table-striped" id="usage-table">
-    <thead>
-      <tr>
-        <th>Agent Name</th>
-        <th>Model Used</th>
-        <th>Input Tokens</th>
-        <th>Output Tokens</th>
-        <th>Cost (USD)</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+
+  <div class="container">
+    <!-- Loading Spinner -->
+    <div class="loading-spinner">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+    </div>
+
+    <!-- Error Message -->
+    <div class="alert alert-danger error-message" role="alert">
+      <i class="bi bi-exclamation-triangle me-2"></i>
+      <span id="error-text">Failed to load data. Please check your connection.</span>
+    </div>
+
+    <!-- Metrics Row -->
+    <div class="row mb-4">
+      <div class="col-md-3 mb-3">
+        <div class="metric-card">
+          <div class="d-flex align-items-center mb-2">
+            <i class="bi bi-currency-dollar text-primary me-2"></i>
+            <h6 class="mb-0 text-muted">Total Cost</h6>
+          </div>
+          <div class="metric-value">$<span id="total-cost">0.00</span></div>
+          <span class="trend-indicator" id="cost-trend"></span>
+        </div>
+      </div>
+      <div class="col-md-3 mb-3">
+        <div class="metric-card">
+          <div class="d-flex align-items-center mb-2">
+            <i class="bi bi-robot text-primary me-2"></i>
+            <h6 class="mb-0 text-muted">Active Agents</h6>
+          </div>
+          <div class="metric-value" id="active-agents">0</div>
+        </div>
+      </div>
+      <div class="col-md-3 mb-3">
+        <div class="metric-card">
+          <div class="d-flex align-items-center mb-2">
+            <i class="bi bi-activity text-primary me-2"></i>
+            <h6 class="mb-0 text-muted">Total Requests</h6>
+          </div>
+          <div class="metric-value" id="total-requests">0</div>
+        </div>
+      </div>
+      <div class="col-md-3 mb-3">
+        <div class="metric-card">
+          <div class="d-flex align-items-center mb-2">
+            <i class="bi bi-clock text-primary me-2"></i>
+            <h6 class="mb-0 text-muted">Last Updated</h6>
+          </div>
+          <div class="text-primary fw-bold" id="last-updated">--</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filter Controls -->
+    <div class="filter-controls">
+      <div class="row align-items-center">
+        <div class="col-md-4">
+          <label class="form-label">Filter by Agent</label>
+          <select class="form-select" id="agent-filter">
+            <option value="">All Agents</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Time Range</label>
+          <select class="form-select" id="time-filter">
+            <option value="all">All Time</option>
+            <option value="today">Today</option>
+            <option value="week">Last 7 Days</option>
+            <option value="month">Last 30 Days</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Sort By</label>
+          <select class="form-select" id="sort-filter">
+            <option value="time-desc">Newest First</option>
+            <option value="time-asc">Oldest First</option>
+            <option value="cost-desc">Highest Cost</option>
+            <option value="cost-asc">Lowest Cost</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+
+
+    <!-- Table -->
+    <div class="table-container">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">Usage Details</h5>
+        <button class="btn btn-sm btn-outline-primary" onclick="exportData()">
+          <i class="bi bi-download me-2"></i>Export CSV
+        </button>
+      </div>
+      <div class="table-responsive">
+        <table class="table custom-table" id="usage-table">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Agent Name</th>
+              <th>Model</th>
+              <th>Input Tokens</th>
+              <th>Output Tokens</th>
+              <th>Total Tokens</th>
+              <th>Cost (USD)</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 
 <script>
-async function fetchData() {
-  const res = await fetch('/log.csv?' + Date.now());
-  const text = await res.text();
-  const lines = text.trim().split('\n');
-  const data = lines.slice(1).map(l => l.split(','));
-  const tbody = document.querySelector('#usage-table tbody');
-  tbody.innerHTML = '';
-  let total = 0;
-  let chartData = {};
-  for (const row of data) {
-    const [name, model, input, output, cost] = row;
-    const c = parseFloat(cost);
-    total += c;
-    chartData[name] = (chartData[name] || 0) + c;
-    let badgeClass = 'bg-success';
-    if (c >= 0.05) badgeClass = 'bg-danger';
-    else if (c >= 0.01) badgeClass = 'bg-warning text-dark';
-    tbody.insertAdjacentHTML('beforeend', `<tr>
-      <td>${name}</td>
-      <td>${model}</td>
-      <td>${input}</td>
-      <td>${output}</td>
-      <td><span class="badge ${badgeClass}">${c.toFixed(4)}</span></td>
-    </tr>`);
-  }
-  document.getElementById('total-cost').textContent = total.toFixed(4);
-  updateChart(chartData);
+// Global state
+let allData = [];
+let filteredData = [];
+let charts = {};
+let autoRefresh = true;
+let refreshInterval;
+let previousTotal = 0;
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+  initializeEventListeners();
+  fetchData();
+  startAutoRefresh();
+});
+
+function initializeEventListeners() {
+  document.getElementById('agent-filter').addEventListener('change', applyFilters);
+  document.getElementById('time-filter').addEventListener('change', applyFilters);
+  document.getElementById('sort-filter').addEventListener('change', applyFilters);
 }
 
-let pieChart;
-function updateChart(chartData) {
-  const ctx = document.getElementById('costChart');
-  const labels = Object.keys(chartData);
-  const values = Object.values(chartData);
-  if (pieChart) pieChart.destroy();
-  pieChart = new Chart(ctx, {
-    type: 'pie',
-    data: {labels: labels, datasets: [{data: values}]},
+async function fetchData() {
+  try {
+    showLoading(true);
+    hideError();
+    
+    const response = await fetch('/log.csv?' + Date.now());
+    if (!response.ok) throw new Error('Failed to fetch data');
+    
+    const text = await response.text();
+    parseCSVData(text);
+    applyFilters();
+    updateAgentFilter();
+    
+  } catch (error) {
+    console.error('Error fetching data:', error);
+    showError(error.message);
+  } finally {
+    showLoading(false);
+  }
+}
+
+function parseCSVData(csvText) {
+  const lines = csvText.trim().split('\n');
+  const headers = lines[0].split(',');
+  
+  allData = lines.slice(1).map(line => {
+    const values = line.split(',');
+    return {
+      timestamp: values[0],
+      agentName: values[1],
+      model: values[2],
+      inputTokens: parseInt(values[3]) || 0,
+      outputTokens: parseInt(values[4]) || 0,
+      cost: parseFloat(values[5]) || 0
+    };
   });
 }
 
-fetchData();
-setInterval(fetchData, 5000);
+function applyFilters() {
+  const agentFilter = document.getElementById('agent-filter').value;
+  const timeFilter = document.getElementById('time-filter').value;
+  const sortFilter = document.getElementById('sort-filter').value;
+  
+  // Filter by agent
+  filteredData = agentFilter 
+    ? allData.filter(d => d.agentName === agentFilter)
+    : [...allData];
+  
+  // Filter by time
+  const now = new Date();
+  if (timeFilter !== 'all') {
+    const ranges = {
+      today: 24 * 60 * 60 * 1000,
+      week: 7 * 24 * 60 * 60 * 1000,
+      month: 30 * 24 * 60 * 60 * 1000
+    };
+    
+    filteredData = filteredData.filter(d => {
+      const date = new Date(d.timestamp);
+      return (now - date) <= ranges[timeFilter];
+    });
+  }
+  
+  // Sort data
+  filteredData.sort((a, b) => {
+    switch (sortFilter) {
+      case 'time-desc': return new Date(b.timestamp) - new Date(a.timestamp);
+      case 'time-asc': return new Date(a.timestamp) - new Date(b.timestamp);
+      case 'cost-desc': return b.cost - a.cost;
+      case 'cost-asc': return a.cost - b.cost;
+      default: return 0;
+    }
+  });
+  
+  updateUI();
+}
+
+function updateUI() {
+  updateMetrics();
+  updateTable();
+}
+
+function updateMetrics() {
+  const totalCost = filteredData.reduce((sum, d) => sum + d.cost, 0);
+  const uniqueAgents = new Set(filteredData.map(d => d.agentName)).size;
+  const totalRequests = filteredData.length;
+  const lastUpdate = filteredData.length > 0 
+    ? formatTimestamp(filteredData[0].timestamp)
+    : '--';
+  
+  document.getElementById('total-cost').textContent = totalCost.toFixed(4);
+  document.getElementById('active-agents').textContent = uniqueAgents;
+  document.getElementById('total-requests').textContent = totalRequests;
+  document.getElementById('last-updated').textContent = lastUpdate;
+  
+  // Update trend indicator
+  const trendElement = document.getElementById('cost-trend');
+  if (previousTotal > 0 && totalCost !== previousTotal) {
+    const increase = totalCost > previousTotal;
+    const change = Math.abs(totalCost - previousTotal);
+    const percentage = ((change / previousTotal) * 100).toFixed(1);
+    
+    trendElement.innerHTML = `
+      <i class="bi bi-${increase ? 'arrow-up' : 'arrow-down'}"></i>
+      ${percentage}% ${increase ? 'increase' : 'decrease'}
+    `;
+    trendElement.className = `trend-indicator ${increase ? 'trend-up' : 'trend-down'}`;
+  }
+  previousTotal = totalCost;
+}
+
+function updateTable() {
+  const tbody = document.querySelector('#usage-table tbody');
+  tbody.innerHTML = '';
+  
+  filteredData.forEach(row => {
+    const totalTokens = row.inputTokens + row.outputTokens;
+    const costClass = getCostClass(row.cost);
+    
+    tbody.innerHTML += `
+      <tr>
+        <td>${formatTimestamp(row.timestamp)}</td>
+        <td>
+          <div class="d-flex align-items-center">
+            <i class="bi bi-robot text-primary me-2"></i>
+            ${row.agentName}
+          </div>
+        </td>
+        <td><code>${row.model}</code></td>
+        <td>${row.inputTokens.toLocaleString()}</td>
+        <td>${row.outputTokens.toLocaleString()}</td>
+        <td><strong>${totalTokens.toLocaleString()}</strong></td>
+        <td><span class="cost-badge ${costClass}">$${row.cost.toFixed(4)}</span></td>
+      </tr>
+    `;
+  });
+}
+
+
+
+
+function updateAgentFilter() {
+  const agentSet = new Set(allData.map(d => d.agentName));
+  const select = document.getElementById('agent-filter');
+  const currentValue = select.value;
+  
+  select.innerHTML = '<option value="">All Agents</option>';
+  Array.from(agentSet).sort().forEach(agent => {
+    select.innerHTML += `<option value="${agent}">${agent}</option>`;
+  });
+  
+  select.value = currentValue;
+}
+
+// Utility functions
+function formatTimestamp(timestamp) {
+  const date = new Date(timestamp);
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+
+function formatHourLabel(hourString) {
+  const date = new Date(hourString);
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit'
+  });
+}
+
+function getCostClass(cost) {
+  if (cost >= 0.05) return 'cost-high';
+  if (cost >= 0.01) return 'cost-medium';
+  return 'cost-low';
+}
+
+function showLoading(show) {
+  document.querySelector('.loading-spinner').style.display = show ? 'block' : 'none';
+}
+
+function showError(message) {
+  document.getElementById('error-text').textContent = message;
+  document.querySelector('.error-message').style.display = 'block';
+}
+
+function hideError() {
+  document.querySelector('.error-message').style.display = 'none';
+}
+
+// Auto-refresh functionality
+function startAutoRefresh() {
+  if (autoRefresh) {
+    refreshInterval = setInterval(fetchData, 5000);
+    document.getElementById('refresh-icon').classList.add('refresh-indicator');
+  }
+}
+
+function stopAutoRefresh() {
+  clearInterval(refreshInterval);
+  document.getElementById('refresh-icon').classList.remove('refresh-indicator');
+}
+
+function toggleAutoRefresh() {
+  autoRefresh = !autoRefresh;
+  document.getElementById('refresh-text').textContent = `Auto-refresh: ${autoRefresh ? 'ON' : 'OFF'}`;
+  
+  if (autoRefresh) {
+    startAutoRefresh();
+  } else {
+    stopAutoRefresh();
+  }
+}
+
+// Export functionality
+function exportData() {
+  const headers = ['Timestamp', 'Agent Name', 'Model', 'Input Tokens', 'Output Tokens', 'Cost'];
+  const rows = filteredData.map(d => [
+    d.timestamp,
+    d.agentName,
+    d.model,
+    d.inputTokens,
+    d.outputTokens,
+    d.cost
+  ]);
+  
+  const csvContent = [headers, ...rows]
+    .map(row => row.join(','))
+    .join('\n');
+  
+  const blob = new Blob([csvContent], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `agent-usage-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 </script>
 </body>
 </html>

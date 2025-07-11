@@ -1,7 +1,16 @@
-from crewai import Agent
+from openai import OpenAI
 
-writer = Agent(
-    role="Writer",
-    goal="Write content",
-    llm={"provider": "openai", "model": "llama-3-8b"}
-)
+class Writer:
+    def __init__(self):
+        self.model = "gpt-4"
+        self.client = OpenAI()
+
+    def run(self, prompt):
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": "You are a writer drafting the final Mars mission plan."},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        return response.choices[0].message.content.strip()

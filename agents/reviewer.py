@@ -1,7 +1,16 @@
-from crewai import Agent
+from openai import OpenAI
 
-reviewer = Agent(
-    role="Reviewer",
-    goal="Review the output",
-    llm={"provider": "openai", "model": "gpt-3.5-turbo"}
-)
+class Reviewer:
+    def __init__(self):
+        self.model = "gpt-3.5-turbo"
+        self.client = OpenAI()
+
+    def run(self, prompt):
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": "You are a mission reviewer and critique planner."},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        return response.choices[0].message.content.strip()
