@@ -80,6 +80,7 @@ Contributions are welcome! Please:
 
 ## Author
 - **Dinesh Kumar**
+- **Arnav Gupta**
 
 ## License
 This project is licensed under the MIT License.
